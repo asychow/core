@@ -174,6 +174,32 @@ DESCRIPTIONS: list[WatergateSensorEntityDescription] = [
     ),
     WatergateSensorEntityDescription(
         value_fn=lambda data: (
+            data.telemetry.ongoing_event.duration
+            if data.telemetry and data.telemetry.ongoing_event
+            else None
+        ),
+        translation_key="water_event_duration",
+        key="water_event_duration",
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        device_class=SensorDeviceClass.DURATION,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    WatergateSensorEntityDescription(
+        value_fn=lambda data: (
+            data.telemetry.ongoing_event.volume / 1000
+            if data.telemetry
+            and data.telemetry.ongoing_event
+            and data.telemetry.ongoing_event.volume is not None
+            else None
+        ),
+        translation_key="water_event_volume",
+        key="water_event_volume",
+        native_unit_of_measurement=UnitOfVolume.LITERS,
+        device_class=SensorDeviceClass.WATER,
+        state_class=SensorStateClass.TOTAL,
+    ),
+    WatergateSensorEntityDescription(
+        value_fn=lambda data: (
             dt_util.as_utc(dt_util.now() - timedelta(seconds=data.state.uptime))
             if data.state
             else None

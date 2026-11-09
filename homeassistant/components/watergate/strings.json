@@ -104,6 +104,12 @@
       "up_since": {
         "name": "Up since"
       },
+      "water_event_duration": {
+        "name": "Water event duration"
+      },
+      "water_event_volume": {
+        "name": "Water event volume"
+      },
       "water_meter_duration": {
         "name": "Water meter duration"
       },

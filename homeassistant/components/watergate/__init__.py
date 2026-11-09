@@ -8,6 +8,7 @@ import logging
 from aiohttp.web import Request, Response
 from watergate_local_api import WatergateApiException, WatergateLocalApiClient
 from watergate_local_api.models import WebhookEvent
+from watergate_local_api.models.water_event import Event
 from watergate_local_api.models.webhook_model import (
     AutoShutOffReportData,
     OnlineEvent,
@@ -136,6 +137,9 @@ def get_webhook_handler(
             )
             coordinator_data.telemetry.water_temperature = (
                 data.temperature if "temperature" not in errors else None
+            )
+            coordinator_data.telemetry.ongoing_event = (
+                Event(**data.event) if "event" not in errors and data.event else None
             )
         elif isinstance(data, WifiChangedEventData):
             coordinator_data.networking.ip = data.ip

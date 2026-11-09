@@ -120,6 +120,9 @@ async def test_telemetry_webhook(
     assert_state(
         "sensor.sonic_water_temperature", DEFAULT_TELEMETRY_STATE.water_temperature
     )
+    # No event is ongoing by default.
+    assert_state("sensor.sonic_water_event_duration", "unavailable")
+    assert_state("sensor.sonic_water_event_volume", "unavailable")
 
     telemetry_change_data = {
         "type": "telemetry",
@@ -133,6 +136,77 @@ async def test_telemetry_webhook(
     assert_state("sensor.sonic_volume_flow_rate", "2.137")
     assert_state("sensor.sonic_water_pressure", "1910")
     assert_state("sensor.sonic_water_temperature", "20")
+    # Still no event: the device omits the "event" field entirely while idle,
+    # it does not send a zeroed-out one.
+    assert_state("sensor.sonic_water_event_duration", "unavailable")
+    assert_state("sensor.sonic_water_event_volume", "unavailable")
+
+
+async def test_telemetry_webhook_ongoing_event(
+    hass: HomeAssistant,
+    hass_client_no_auth: ClientSessionGenerator,
+    mock_entry: MockConfigEntry,
+    mock_watergate_client: Generator[AsyncMock],
+) -> None:
+    """Test that an ongoing water event is reflected and cleared correctly."""
+    await init_integration(hass, mock_entry)
+    client = await hass_client_no_auth()
+
+    def assert_state(entity_id: str, expected_state: str) -> None:
+        state = hass.states.get(entity_id)
+        assert state
+        assert state.state == expected_state
+
+    await client.post(
+        f"/api/webhook/{MOCK_WEBHOOK_ID}",
+        json={
+            "type": "telemetry",
+            "data": {
+                "flow": 2137,
+                "pressure": 1910,
+                "temperature": 20,
+                "event": {"duration": 42, "volume": 3138},
+            },
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert_state("sensor.sonic_water_event_duration", "42")
+    assert_state("sensor.sonic_water_event_volume", "3.138")
+
+    # The device reports an error for the event field instead of omitting it:
+    # treated the same as a missing event, not as a zeroed-out one.
+    await client.post(
+        f"/api/webhook/{MOCK_WEBHOOK_ID}",
+        json={
+            "type": "telemetry",
+            "data": {
+                "flow": 2137,
+                "pressure": 1910,
+                "temperature": 20,
+                "event": {"duration": 42, "volume": 3138},
+                "errors": ["event"],
+            },
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert_state("sensor.sonic_water_event_duration", "unavailable")
+    assert_state("sensor.sonic_water_event_volume", "unavailable")
+
+    # The event ends: the device goes back to omitting the field entirely
+    # rather than sending a zeroed-out one.
+    await client.post(
+        f"/api/webhook/{MOCK_WEBHOOK_ID}",
+        json={
+            "type": "telemetry",
+            "data": {"flow": 0, "pressure": 1910, "temperature": 20},
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert_state("sensor.sonic_water_event_duration", "unavailable")
+    assert_state("sensor.sonic_water_event_volume", "unavailable")
 
 
 @pytest.mark.usefixtures("entity_registry_enabled_by_default")
